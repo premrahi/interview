@@ -43,7 +43,7 @@ if not st.session_state.interview_active:
         role = st.selectbox(
             "Select Job Profile",
             ["Software Engineer", "Data Scientist", "Product Manager", "Marketing Specialist", "HR Manager", 
-             "Web Developer", "Quality Analyst", "Data Engineer"]
+             "Web Developer", "Quality Analyst", "Data Engineer", "Data Analyst"]
         )
         submitted = st.form_submit_button("Start Interview")
         

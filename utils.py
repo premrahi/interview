@@ -12,7 +12,7 @@ def get_llm(api_key, provider="OpenAI"):
     if provider == "OpenAI":
         return ChatOpenAI(api_key=api_key, model="gpt-3.5-turbo")
     elif provider == "Gemini":
-        return ChatGoogleGenerativeAI(google_api_key=api_key, model="gemini-2.0-flash")
+        return ChatGoogleGenerativeAI(google_api_key=api_key, model="gemini-2.5-flash")
     return None
 
 def get_ai_question(profile, history, api_key, provider="OpenAI"):
@@ -54,8 +54,8 @@ def transcribe_audio(audio_bytes, api_key=None):
             import google.generativeai as genai
             genai.configure(api_key=api_key)
             
-            # Gemini 2.0 Flash is good for audio
-            model = genai.GenerativeModel("gemini-2.0-flash")
+            # Gemini 2.5 Flash is good for audio
+            model = genai.GenerativeModel("gemini-2.5-flash")
             
             prompt = "Transcribe the following audio exactly as spoken. Do not add any other text."
             
@@ -125,22 +125,30 @@ def evaluate_interview(profile, history, api_key, provider="OpenAI"):
         Interview Transcript:
         {history}
         
-        Please provide a detailed evaluation report including:
-        1. Overall Impression
-        2. Strengths
-        3. Areas for Improvement
-        4. Rating (1-10)
-        5. Hiring Recommendation (Strong Hire, Hire, No Hire)
+        Output the result strictly in valid JSON format with the following keys:
+        1. "report_markdown": A detailed markdown report (Overall Impression, Strengths, Areas for Improvement, Rating 1-10, Hiring Recommendation).
+        2. "recommendation": One of "Strong Hire", "Hire", "No Hire".
+        3. "motivational_message": If recommendation is "No Hire", provide a short, encouraging 1-2 sentence motivational message for the candidate. Otherwise, leave empty string.
         
-        Format the output as clean Markdown.
+        Do not include markdown formatting (like ```json) around the output. Just the raw JSON string.
         """
     )
     
     try:
         chain = prompt | llm | StrOutputParser()
-        return chain.invoke({"profile": profile, "history": history_text})
+        result_str = chain.invoke({"profile": profile, "history": history_text})
+        
+        # Clean up potential markdown code blocks if model adds them
+        result_str = result_str.replace("```json", "").replace("```", "").strip()
+        
+        import json
+        return json.loads(result_str)
     except Exception as e:
-        return f"Error generating evaluation: {str(e)}. Please check your API Key in .env file."
+        return {
+            "report_markdown": f"Error generating evaluation: {str(e)}. Please check your API Key in .env file.",
+            "recommendation": "Error",
+            "motivational_message": ""
+        }
 
 def save_session(profile, history, evaluation):
     """Saves the interview session to a JSON file."""
@@ -159,3 +167,46 @@ def save_session(profile, history, evaluation):
         json.dump(data, f, indent=4)
     
     return filename
+
+def text_to_speech(text):
+    """Converts text to speech using edge-tts (high quality neural voice)."""
+    try:
+        import asyncio
+        import edge_tts
+        import base64
+        import tempfile
+        
+        # Voice: Indian English Female (Neerja) - High Quality
+        VOICE = "en-IN-NeerjaNeural"
+        
+        async def _generate():
+            communicate = edge_tts.Communicate(text, VOICE)
+            # Create a temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+                await communicate.save(tmp.name)
+                return tmp.name
+
+        # Run async function
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+        mp3_path = loop.run_until_complete(_generate())
+        
+        # Read and encode
+        with open(mp3_path, "rb") as f:
+            audio_bytes = f.read()
+            
+        # Cleanup
+        try:
+            os.remove(mp3_path)
+        except:
+            pass
+            
+        b64 = base64.b64encode(audio_bytes).decode()
+        return b64
+    except Exception as e:
+        print(f"TTS Error: {e}")
+        return None

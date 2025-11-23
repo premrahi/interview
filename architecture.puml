@@ -1,0 +1,46 @@
+@startuml
+!theme vibrant
+title AI Virtual Interviewer - System Architecture
+
+package "User Interface" {
+    [Streamlit Frontend] as UI
+    note right of UI
+        - Job Profile Selection
+        - Audio Recorder Widget
+        - Dark Mode Toggle
+        - Real-time Feedback
+    end note
+}
+
+package "Application Logic" {
+    [Main Controller (app.py)] as App
+    [Helper Functions (utils.py)] as Utils
+    
+    App -> Utils : Uses
+}
+
+package "Data Layer" {
+    database "Session History" as State
+    folder "File Storage (data/)" as FS
+    folder "Assets (assets/)" as Assets
+}
+
+cloud "External Services" {
+    [Google Gemini API] as AI
+    note right of AI
+        Model: gemini-2.0-flash
+        - Question Generation
+        - Audio Transcription
+        - Interview Evaluation
+    end note
+}
+
+' Relationships
+User -> UI : Interacts
+UI -> App : Events
+App -> State : Updates Session
+App -> Assets : Loads Images
+Utils -> AI : API Calls
+Utils -> FS : Saves JSON Reports
+
+@enduml
